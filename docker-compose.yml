@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 데이터베이스
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: qchatbot-postgres
+    environment:
+      POSTGRES_DB: qchatbot
+      POSTGRES_USER: qchatbot_user
+      POSTGRES_PASSWORD: qchatbot_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - qchatbot-network
+
+  # FastAPI 백엔드
+  backend:
+    build: .
+    container_name: qchatbot-backend
+    environment:
+      - DATABASE_URL=postgresql://qchatbot_user:qchatbot_password@postgres:5432/qchatbot
+      - AZURE_OPENAI_API_KEY=${AZURE_OPENAI_API_KEY}
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT}
+      - AZURE_OPENAI_API_VERSION=${AZURE_OPENAI_API_VERSION}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - COHERE_API_KEY=${COHERE_API_KEY}
+      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    networks:
+      - qchatbot-network
+    volumes:
+      - ./uploads:/app/uploads
+
+  # Streamlit 프론트엔드
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: qchatbot-frontend
+    environment:
+      - BACKEND_URL=http://backend:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
+    networks:
+      - qchatbot-network
+
+volumes:
+  postgres_data:
+
+networks:
+  qchatbot-network:
+    driver: bridge 
